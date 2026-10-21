@@ -1,0 +1,269 @@
+<!--
+CHECK YOUR PDF HAS SELECTABLE TEXT (DO THIS BEFORE SUBMISSION)
+
+Export via Chrome:
+1) Knit → Knit to HTML.
+2) In the preview, click "Open in Browser" (Chrome).
+3) Press Ctrl+P (Cmd+P) → Destination: "Save as PDF".
+4) Save, then open the PDF and verify you can select text and use Ctrl+F to search.
+If you cannot highlight text, do not submit — repeat the steps or knit directly to PDF.
+-->
+---
+title: "MATH2349 Data Wrangling"
+subtitle: "Practical Assessment 2"
+author: "Submitting student full name (student number)"
+date: "`r format(Sys.Date(), '%d/%m/%Y')`"
+output:
+  html_document:
+    df_print: paged
+  pdf_document:
+    latex_engine: xelatex
+---
+
+# 1. Students’ Details 
+
+<!--
+If working individually: include only your details and Contribution = 100%.*
+-->
+
+| Student Name | Student Number | Contribution (%) |
+|:-------------|:---------------|:-----------------|
+| Name1        | Number1        | Percentage1      |
+| Name2        | Number2        | Percentage2      |
+
+: Group Information
+
+---
+
+# 2. Required Packages
+
+<!--
+List the packages needed to reproduce your report.
+-->
+
+The following R packages are required to reproduce this report.
+
+```{r setup, include=TRUE}
+# Load necessary packages
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(readr)
+library(lubridate)
+
+# Add other packages as required
+```
+---
+
+# 3. Executive Summary
+
+<!--
+
+Provide a concise summary of your preprocessing steps (maximum 300 words).  
+- Use bullet points where possible.  
+- Highlight the main actions taken and why.  
+- Keep it clear and non-technical.
+
+-->
+
+---
+
+# 4. Data
+
+<!--
+
+- Describe your datasets and their sources (must be from the approved list).
+- Explain variables and data structure.
+- Apply the random subset requirement to **both of your datasets**:
+  - Use set.seed(your_student_number) (or one group member’s number).
+  - Select at least 80% of rows but not the full dataset.
+  - Each subset must be used in all further analysis.
+- You must also join your two datasets on a common key.
+  - It is up to you whether you perform the join before or after subsetting.
+
+-->
+
+The datasets used in this report are described below, along with the steps taken to create the required random subsets.
+
+```{r data-import}
+# Example (replace with your datasets and ID):
+set.seed(123456)  # Replace with student number
+
+# Example of subsetting two datasets
+# subset_data1 <- data1[sample(nrow(data1), size = 0.8*nrow(data1)), ]
+# subset_data2 <- data2[sample(nrow(data2), size = 0.8*nrow(data2)), ]
+
+# Example join (students may do this before or after subsetting)
+# merged_data <- merge(subset_data1, subset_data2, by = "common_key")
+```
+
+---
+
+# 5. Understand
+
+<!--
+
+- Summarise data structures and variable types.  
+- Apply conversions (e.g., character → factor/date, numeric → factor).  
+- Ensure your merged dataset meets the minimum criteria:  
+  - At least 1 numeric variable  
+  - At least 1 character variable  
+  - At least 1 factor variable
+
+-->
+
+```{r understand}
+```
+
+---
+
+# 6. Tidy & Manipulate Data I
+
+<!--
+
+- Identify and explain why your dataset is untidy.  
+- Reshape to tidy format using R code.  
+- Show before/after structures and explain clearly.
+
+-->
+
+```{r tidy1}
+```
+
+---
+
+# 7. Tidy & Manipulate Data II
+
+<!--
+
+- Create/mutate at least one new variable from your existing variables.  
+- Explain why you created it.
+
+-->
+
+```{r tidy2}
+```
+
+---
+
+# 8. Scan I
+
+<!--
+
+- Scan all variables for missing values, special values, and inconsistencies.  
+- Apply appropriate cleaning techniques and explain why.
+
+-->
+
+```{r scan1}
+```
+
+---
+
+# 9. Scan II
+
+<!--
+
+- Scan all numeric variables for outliers:  
+  - Univariate outliers  
+  - Potential multivariate outliers  
+- Show your approach and decisions.
+
+-->
+
+```{r scan2}
+```
+
+---
+
+# 10. Transform
+
+<!--
+
+- Apply transformation to at least one variable.  
+- Possible purposes:  
+  - Adjust scale for comprehension  
+  - Convert non-linear → linear  
+  - Reduce skewness / normalise distribution
+
+-->
+
+```{r transform}
+```
+
+---
+
+# 11. Reflection on Challenges and Ease
+
+<!--
+
+(max 300 words, use bullet points)  
+
+- Challenges Faced – what was difficult and how you dealt with it.  
+- Ease & Strengths – which parts were straightforward and why.  
+- Insights & Learning – what you learned about your process and problem-solving.
+
+-->
+
+---
+
+# 12. Presentation Link(s)
+
+<!--
+
+Important notes while recording your presentation:
+
+- Use the screen recording feature with the webcam enabled in Canvas Studio.
+- Ensure both your face and report are visible on screen.
+- Keep your presentation clear, professional, and within 3–5 minutes.
+- Each group member must create and share their own individual video links in the assessment (joint recording is not acceptable).
+- Test your video link to ensure it works before submitting.
+- Share a working URL link(s) in your assessment, ensuring access settings allow the instructor to view it.
+
+Example:
+- [Student1 Presentation](URL_here)
+- [Student2 Presentation](URL_here)
+
+-->
+
+---
+
+# Generative AI Usage (if applicable)
+
+<!--
+
+If you used a generative AI tool (e.g., ChatGPT, Copilot):  
+- State which tool.  
+- Explain how you used it.  
+- Explain how you verified correctness.  
+- Reference it appropriately using RMIT Harvard style.  
+
+If no AI used, write:  
+> “No generative AI tools were used in this assessment.”
+
+-->
+
+---
+
+# References
+
+<!--
+
+- List all external sources in RMIT Harvard referencing style.  
+- Use EasyCite, EndNote, or RMIT library guides for help.
+
+-->
+
+---
+
+<!--
+
+# Notes & Reminders
+
+- Maximum length: 25 pages – 5% penalty per extra page.  
+- Late submission penalty: 10% of total mark per day, up to 5 days. After 5 days, submission not accepted.  
+- Use the rubric as a checklist to ensure all sections are complete.  
+- Referencing must follow RMIT Harvard style.  
+- Each student must provide an individual Canvas Studio video link.
+
+-->
