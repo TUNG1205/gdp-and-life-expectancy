@@ -11,7 +11,7 @@ If you cannot highlight text, do not submit — repeat the steps or knit directl
 ---
 title: "MATH2349 Data Wrangling"
 subtitle: "Practical Assessment 2"
-author: "Submitting student full name (student number)"
+author: "Tung Duc Nguyen, Hoang Nguyen"
 date: "`r format(Sys.Date(), '%d/%m/%Y')`"
 output:
   html_document:
@@ -28,8 +28,8 @@ If working individually: include only your details and Contribution = 100%.*
 
 | Student Name | Student Number | Contribution (%) |
 |:-------------|:---------------|:-----------------|
-| Name1        | Number1        | Percentage1      |
-| Name2        | Number2        | Percentage2      |
+| Hoang Nguyen        | s4280335        | 50%      |
+| Tung Duc Nguyen        | s4280335        | 50%      |
 
 : Group Information
 
@@ -83,21 +83,176 @@ Provide a concise summary of your preprocessing steps (maximum 300 words).
 
 -->
 
-The datasets used in this report are described below, along with the steps taken to create the required random subsets.
+Two datasets were obtained from the World Bank's World Development Indicators database.
+
+**Dataset 1: GDP per capita (current US$)**  
+Source: https://data.worldbank.org/indicator/NY.GDP.PCAP.CD
+
+This dataset measures gross domestic product per person in current US dollars. It includes country names, country codes, indicator information, and annual GDP per capita values from 1960 to 2025.
+
+**Dataset 2: Life expectancy at birth, total (years)**  
+Source: https://data.worldbank.org/indicator/SP.DYN.LE00.IN
+
+This dataset estimates the number of years a newborn would live if current mortality patterns remained unchanged. It contains the same geographical identifiers and annual reporting structure.
+
+Both datasets contain 266 country, economy, and regional aggregate records. They share the Country Code variable and reporting years, allowing them to be merged after reshaping into long format.
+
+The datasets are initially presented in wide format, with individual years stored as separate columns. This structure will be addressed during the tidying stage.
 
 ```{r data-import}
 # Example (replace with your datasets and ID):
-set.seed(123456)  # Replace with student number
-
 # Example of subsetting two datasets
 # subset_data1 <- data1[sample(nrow(data1), size = 0.8*nrow(data1)), ]
 # subset_data2 <- data2[sample(nrow(data2), size = 0.8*nrow(data2)), ]
 
-# Example join (students may do this before or after subsetting)
-# merged_data <- merge(subset_data1, subset_data2, by = "common_key")
+# Import the World Bank datasets
+gdp_raw <- read_csv(
+  "API_NY.GDP.PCAP.CD_DS2_en_csv_v2_1529.csv",
+  skip = 4,
+  show_col_types = FALSE
+)
+
+life_raw <- read_csv(
+  "API_SP.DYN.LE00.IN_DS2_en_csv_v2_1528.csv",
+  skip = 4,
+  show_col_types = FALSE
+)
+
+# Check the dimensions of both datasets
+dim(gdp_raw)
+dim(life_raw)
+
+# Preview the identifying variables
+head(gdp_raw[, 1:4])
+head(life_raw[, 1:4])
+```
+We used `read_csv()` from the readr package to import both World Bank datasets into R. The `skip = 4` argument was applied to exclude the preliminary metadata lines. We then used `dim()` to examine the dimensions of each dataset and `head()` to preview the first six observations.
+
+The results showed that both datasets contain 266 observations and 71 variables. The preview confirmed that the datasets were imported successfully and contain matching geographical identifiers, including Country Name and Country Code. These identifiers will support the subsequent merging process.
+
+```{r data-sampling}
+# Randomly sample 95% of rows from each original dataset
+set.seed(4280335)
+
+gdp_sample <- gdp_raw[
+  sample(nrow(gdp_raw), size = floor(0.95 * nrow(gdp_raw))),
+]
+
+life_sample <- life_raw[
+  sample(nrow(life_raw), size = floor(0.95 * nrow(life_raw))),
+]
+
+# Verify sampled dimensions
+dim(gdp_sample)
+dim(life_sample)
 ```
 
----
+We used `set.seed(4280335)` to ensure that the random sampling process is reproducible. We then applied `sample()` to independently select approximately 95% of the observations from each original dataset, using `floor()` to obtain a whole-number sample size.
+
+The results showed that both datasets were reduced from 266 to 252 observations, while retaining all 71 variables. This corresponds to approximately 94.74% of the original observations, satisfying the requirement to randomly sample at least 80% but less than 100% of each dataset. All subsequent preprocessing steps will use these sampled datasets.
+
+```{r data-tidying}
+# Convert GDP dataset from wide to long format
+gdp_tidy <- gdp_sample %>%
+  select(`Country Name`, `Country Code`, matches("^[0-9]{4}$")) %>%
+  pivot_longer(
+    cols = matches("^[0-9]{4}$"),
+    names_to = "Year",
+    values_to = "GDP_per_capita"
+  ) %>%
+  mutate(Year = as.integer(Year)) %>%
+  rename(
+    Country_Name = `Country Name`,
+    Country_Code = `Country Code`
+  )
+
+# Convert life expectancy dataset from wide to long format
+life_tidy <- life_sample %>%
+  select(`Country Name`, `Country Code`, matches("^[0-9]{4}$")) %>%
+  pivot_longer(
+    cols = matches("^[0-9]{4}$"),
+    names_to = "Year",
+    values_to = "Life_expectancy"
+  ) %>%
+  mutate(Year = as.integer(Year)) %>%
+  rename(
+    Country_Name = `Country Name`,
+    Country_Code = `Country Code`
+  )
+
+# Check the dimensions after tidying
+dim(gdp_tidy)
+dim(life_tidy)
+
+# Preview the tidied datasets
+head(gdp_tidy)
+head(life_tidy)
+```
+We used `pivot_longer()` from the tidyr package to reshape both datasets from wide to long format, as the original datasets stored individual years as separate columns. The year columns were converted into a single Year variable, while the corresponding values were stored in GDP_per_capita and Life_expectancy.
+
+We then used `as.integer()` to convert Year from character to integer and `rename()` to standardise the country identifier names. All available years from 1960 to 2025 were retained to preserve the historical observations and allow missing values to be investigated during the scanning stage.
+
+The results showed that both datasets were reshaped into 16,632 observations and four variables. Each row now represents one geographical record in a specific year, making the datasets suitable for merging using Country_Code and Year.
+
+```{r data-merge}
+# Check for duplicate country-year keys
+sum(duplicated(gdp_tidy[c("Country_Code", "Year")]))
+sum(duplicated(life_tidy[c("Country_Code", "Year")]))
+
+# Merge both datasets using Country Code and Year
+merged_data <- inner_join(
+  gdp_tidy,
+  life_tidy %>%
+    select(Country_Code, Year, Life_expectancy),
+  by = c("Country_Code", "Year")
+)
+
+# Check the merged dataset
+dim(merged_data)
+head(merged_data)
+```
+We used `duplicated()` to check whether the combination of Country_Code and Year uniquely identifies observations in each dataset. The results returned zero duplicates for both datasets, confirming that each country-year combination is unique.
+
+We then applied `inner_join()` from the dplyr package to merge the two datasets using Country_Code and Year. An inner join was selected to retain only the country-year combinations present in both randomly sampled datasets. We also used `select()` to avoid duplicating the country name variable.
+
+The resulting dataset contains 15,708 observations and five variables, representing 238 geographical records across 66 years (1960–2025). We used `dim()` and `head()` to verify the merged structure and confirm that GDP per capita and life expectancy were correctly combined.
+
+
+```{r data-filter-countries}
+# Import the World Bank country metadata
+country_metadata <- read_csv(
+  "Metadata_Country_API_NY.GDP.PCAP.CD_DS2_en_csv_v2_1529.csv",
+  show_col_types = FALSE
+) %>%
+  select(`Country Code`, Region, IncomeGroup) %>%
+  rename(Country_Code = `Country Code`)
+
+# Check metadata structure and missing Region values
+dim(country_metadata)
+sum(is.na(country_metadata$Region))
+sum(duplicated(country_metadata$Country_Code))
+
+# Attach country information to the merged dataset
+merged_with_metadata <- merged_data %>%
+  left_join(country_metadata, by = "Country_Code")
+
+# Keep individual countries and economies only
+country_data <- merged_with_metadata %>%
+  filter(!is.na(Region))
+
+# Verify the country-level dataset
+dim(country_data)
+n_distinct(country_data$Country_Code)
+head(country_data)
+```
+We used the accompanying World Bank country metadata as supporting information to identify individual countries and economies and distinguish them from regional aggregates. The metadata contains 265 records, including 48 with missing Region values, and no duplicate country codes.
+
+We then applied `left_join()` to attach Region and IncomeGroup classifications to the merged dataset. These classifications were used to identify the geographical categories of existing observations rather than introduce additional economic or health measurements. Since regional aggregates represent groups of countries rather than individual economies, we used `filter(!is.na(Region))` to exclude them and maintain a consistent country-level analysis.
+
+The results showed that 44 regional and other aggregate records were excluded from the 238 matched geographical records. The resulting dataset contains 12,804 observations and seven variables, representing 194 individual countries and economies across 66 years (1960–2025).
+
+Importantly, the metadata did not modify, replace, or recalculate any GDP per capita or life expectancy values for the retained observations. It was used only to provide country classifications and support the exclusion of aggregates. Therefore, the analysis remains based on the two original World Bank indicator datasets, and their missing values were preserved for investigation during the scanning stage.
+
 
 # 5. Understand
 
@@ -113,6 +268,19 @@ set.seed(123456)  # Replace with student number
 -->
 
 ```{r understand}
+# Examine the dimensions and structure of the merged dataset
+dim(country_data)
+str(country_data)
+
+# Check the class of each variable
+sapply(country_data, class)
+
+# Examine the categorical variables
+unique(country_data$Region)
+unique(country_data$IncomeGroup)
+
+# Check the frequency of income groups
+table(country_data$IncomeGroup, useNA = "ifany")
 ```
 
 ---
