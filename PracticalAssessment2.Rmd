@@ -283,6 +283,57 @@ unique(country_data$IncomeGroup)
 table(country_data$IncomeGroup, useNA = "ifany")
 ```
 
+We used `dim()` and `str()` to examine the dimensions and structure of the country-level dataset. The results showed that the dataset is stored as a tibble containing 12,804 observations and seven variables.
+
+We then used `sapply()` with `class()` to identify the data type of each variable. Country_Name, Country_Code, Region, and IncomeGroup were classified as character variables, Year as integer, and GDP_per_capita and Life_expectancy as numeric.
+
+We also used `unique()` to examine the categorical values, identifying seven geographical regions and four income groups. The frequency table showed that high-income economies accounted for the largest number of country-year observations (5,016), while low-income economies accounted for the smallest (1,518).
+
+Based on these results, Region and IncomeGroup were identified as suitable variables for factor conversion.
+
+```{r data-conversion}
+# Convert Region to an unordered factor
+# Convert IncomeGroup to an ordered and labelled factor
+country_data <- country_data %>%
+  mutate(
+    Region = factor(Region),
+    IncomeGroup = factor(
+      IncomeGroup,
+      levels = c(
+        "Low income",
+        "Lower middle income",
+        "Upper middle income",
+        "High income"
+      ),
+      labels = c(
+        "Low income",
+        "Lower-middle income",
+        "Upper-middle income",
+        "High income"
+      ),
+      ordered = TRUE
+    )
+  )
+
+# Verify the data types after conversion
+sapply(country_data, class)
+
+# Check factor levels and their ordering
+levels(country_data$Region)
+levels(country_data$IncomeGroup)
+is.ordered(country_data$IncomeGroup)
+
+# Verify income group frequencies
+table(country_data$IncomeGroup)
+```
+We used `factor()` to convert Region from character to an unordered factor because geographical regions are categorical variables without a natural ranking. We also converted IncomeGroup into an ordered factor using four levels, ranging from Low income to High income. The `labels` argument was used to provide consistent and readable category names.
+
+We then used `sapply()` with `class()` to verify the conversions and `levels()` to examine the factor categories. The results confirmed that Region was successfully converted into a factor, while IncomeGroup was classified as an ordered factor. The `is.ordered()` function also returned TRUE, confirming the intended ordering.
+
+The frequency table showed that the original income-group counts remained unchanged after conversion. The dataset continues to contain character, numeric, integer, and factor variables, satisfying the required variety of data types.
+
+
+
 ---
 
 # 6. Tidy & Manipulate Data I
@@ -294,10 +345,41 @@ table(country_data$IncomeGroup, useNA = "ifany")
 - Show before/after structures and explain clearly.
 
 -->
+Both World Bank datasets were originally presented in wide format, with each country or economy occupying one row and annual measurements from 1960 to 2025 stored in separate columns.
+
+This structure is untidy for country-year analysis because the year values are embedded in column names rather than stored in a single variable. To satisfy the tidy data principles, each year should be represented as a value in one Year column, with the corresponding GDP per capita or life expectancy measurement stored in another column.
+
+We therefore used `pivot_longer()` in Section 4 to reshape both sampled datasets into long format before merging them.
 
 ```{r tidy1}
-```
+# Show the original wide format (three example years)
+head(
+  gdp_sample[, c("Country Name", "Country Code",
+                 "1960", "1961", "1962")],
+  3
+)
 
+head(
+  life_sample[, c("Country Name", "Country Code",
+                  "1960", "1961", "1962")],
+  3
+)
+
+# Show the tidy long format
+head(gdp_tidy, 6)
+head(life_tidy, 6)
+
+# Verify dimensions after reshaping
+dim(gdp_tidy)
+dim(life_tidy)
+```
+We used `head()` to compare the structure of both datasets before and after tidying. The original samples contained 252 geographical records and 71 variables, with annual measurements stored in separate columns such as 1960, 1961, and 1962.
+
+After applying `pivot_longer()`, the results showed that both datasets contained 16,632 observations and four variables. The Year column now stores reporting years as integer values, while GDP_per_capita and Life_expectancy contain their corresponding numeric measurements.
+
+The reshaped datasets satisfy the three tidy data principles: each variable occupies one column, each country-year observation occupies one row, and each cell contains a single value. Missing indicator values were preserved for further investigation during the scanning stage.
+
+This structure also allows the two datasets to be merged consistently using Country_Code and Year.
 ---
 
 # 7. Tidy & Manipulate Data II
@@ -310,8 +392,41 @@ table(country_data$IncomeGroup, useNA = "ifany")
 -->
 
 ```{r tidy2}
-```
+# Create an ordered life expectancy group
+country_data <- country_data %>%
+  mutate(
+    Life_Expectancy_Group = cut(
+      Life_expectancy,
+      breaks = c(-Inf, 60, 70, 80, Inf),
+      labels = c("Below 60", "60-69", "70-79", "80+"),
+      right = FALSE,
+      ordered_result = TRUE
+    )
+  )
 
+# Preview the new variable
+head(
+  country_data %>%
+    select(Country_Name, Year, Life_expectancy,
+           Life_Expectancy_Group),
+  10
+)
+
+# Check the structure and levels
+str(country_data$Life_Expectancy_Group)
+levels(country_data$Life_Expectancy_Group)
+
+# Check the frequency of each group, including missing values
+table(country_data$Life_Expectancy_Group, useNA = "ifany")
+
+# Verify the updated dimensions
+dim(country_data)
+```
+We used `mutate()` and `cut()` to create a new variable called Life_Expectancy_Group from the existing Life_expectancy variable. The measurements were classified into four categories: Below 60, 60–69, 70–79, and 80+ years. These categories were created to simplify comparisons of life expectancy across countries and years.
+
+We set `right = FALSE` to ensure that boundary values were included in the appropriate categories and `ordered_result = TRUE` to create an ordered factor. The original Life_expectancy measurements were preserved.
+
+The results showed that the 70–79 group contained the largest number of observations (4,549), while the 80+ group contained the smallest (797). There were also 228 missing classifications, corresponding to missing life expectancy values. The dataset retained all 12,804 observations and now contains eight variables.
 ---
 
 # 8. Scan I
