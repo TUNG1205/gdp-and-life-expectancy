@@ -439,8 +439,205 @@ The results showed that the 70–79 group contained the largest number of observ
 -->
 
 ```{r scan1}
-```
+# Count missing values for each variable
+colSums(is.na(country_data))
 
+# Calculate missing-value percentages
+round(colMeans(is.na(country_data)) * 100, 2)
+
+# Create a summary table for all variables
+missing_summary <- data.frame(
+  Variable = names(country_data),
+  Missing_Count = colSums(is.na(country_data)),
+  Missing_Percent = round(
+    colMeans(is.na(country_data)) * 100, 2
+  )
+)
+
+missing_summary
+
+# Count observations containing at least one missing value
+sum(!complete.cases(country_data))
+```
+We used `is.na()` with `colSums()` and `colMeans()` to identify the number and percentage of missing values in each variable. The results showed that GDP_per_capita contained 2,304 missing values (17.99%), while Life_expectancy contained 228 missing values (1.78%).
+
+The derived Life_Expectancy_Group variable also contained 228 missing values because its categories depend directly on Life_expectancy. The remaining five variables had no missing values.
+
+GDP per capita therefore showed the highest proportion of missing observations. Further investigation was required to determine whether these missing values were concentrated in particular years or countries before selecting an appropriate treatment method.
+
+```{r scan1-patterns}
+# Examine missing values by year
+missing_by_year <- country_data %>%
+  group_by(Year) %>%
+  summarise(
+    GDP_missing = sum(is.na(GDP_per_capita)),
+    Life_missing = sum(is.na(Life_expectancy)),
+    .groups = "drop"
+  )
+
+# Years with the most missing GDP observations
+head(
+  missing_by_year %>% arrange(desc(GDP_missing)),
+  10
+)
+
+# Years with the most missing life expectancy observations
+head(
+  missing_by_year %>% arrange(desc(Life_missing)),
+  10
+)
+
+# Identify countries with the most missing GDP observations
+missing_by_country <- country_data %>%
+  group_by(Country_Code, Country_Name) %>%
+  summarise(
+    GDP_missing = sum(is.na(GDP_per_capita)),
+    Life_missing = sum(is.na(Life_expectancy)),
+    .groups = "drop"
+  )
+
+head(
+  missing_by_country %>% arrange(desc(GDP_missing)),
+  10
+)
+
+# Check how many rows contain at least one missing value
+sum(!complete.cases(country_data))
+```
+We used `group_by()` and `summarise()` to investigate missing-value patterns across years and countries. The results showed that GDP per capita missingness was particularly high in earlier years, with 95 missing observations in 1960 and 93 in 1961.
+
+For life expectancy, all 194 observations in 2025 were missing, indicating that no life expectancy measurements were available for that year in the sampled country-level dataset.
+
+We also identified countries with substantial missing GDP information. Gibraltar and North Korea had missing GDP per capita values across all 66 years, while St. Martin (French part) and South Sudan had 62 and 58 missing observations, respectively.
+
+Finally, `complete.cases()` showed that 2,475 observations (19.33%) contained at least one missing value. These results indicate that missingness varies considerably across countries and years. Therefore, applying a single overall mean to replace missing values would be inappropriate, as it could distort historical and cross-country differences.
+
+```{r scan1-errors}
+# Check for duplicate country-year observations
+sum(duplicated(country_data[c("Country_Code", "Year")]))
+
+# Check for empty country identifiers
+sum(trimws(country_data$Country_Name) == "", na.rm = TRUE)
+sum(trimws(country_data$Country_Code) == "", na.rm = TRUE)
+
+# Check for invalid reporting years
+sum(!country_data$Year %in% 1960:2025)
+
+# Check for invalid or unusual numeric values
+sum(country_data$GDP_per_capita <= 0, na.rm = TRUE)
+
+sum(country_data$Life_expectancy <= 0, na.rm = TRUE)
+sum(country_data$Life_expectancy > 120, na.rm = TRUE)
+
+# Check special numeric values
+sum(is.infinite(country_data$GDP_per_capita))
+sum(is.infinite(country_data$Life_expectancy))
+
+sum(is.nan(country_data$GDP_per_capita))
+sum(is.nan(country_data$Life_expectancy))
+
+# Confirm that missing derived categories match missing life expectancy
+sum(
+  is.na(country_data$Life_Expectancy_Group) !=
+  is.na(country_data$Life_expectancy)
+)
+```
+We used `duplicated()` to check for repeated country-year records and `trimws()` to identify empty country identifiers. We also examined reporting years outside the expected range of 1960–2025 and checked for non-positive GDP per capita, non-positive life expectancy, and life expectancy values exceeding 120 years.
+
+In addition, `is.infinite()` and `is.nan()` were used to identify special numeric values. We also verified that missing values in Life_Expectancy_Group corresponded to missing Life_expectancy measurements.
+
+All 12 checks returned zero, indicating that no observations violated the specified validation rules. However, these results do not rule out other potential inconsistencies, particularly unusually large changes between consecutive years. Further examination was therefore required.
+
+```{r scan1-consistency}
+# Calculate annual changes in life expectancy
+life_changes <- country_data %>%
+  arrange(Country_Code, Year) %>%
+  group_by(Country_Code, Country_Name) %>%
+  mutate(
+    Annual_Change = Life_expectancy - lag(Life_expectancy)
+  ) %>%
+  ungroup()
+
+# Identify changes greater than 10 years in either direction
+suspicious_changes <- life_changes %>%
+  filter(
+    !is.na(Annual_Change),
+    abs(Annual_Change) > 10
+  ) %>%
+  arrange(desc(abs(Annual_Change))) %>%
+  select(
+    Country_Name, Year,
+    Life_expectancy, Annual_Change
+  )
+
+# Count and examine suspicious changes
+nrow(suspicious_changes)
+head(suspicious_changes, 10)
+
+# Examine suspicious changes in surrounding years
+life_changes %>%
+  filter(
+    Country_Name == "Central African Republic",
+    Year %in% c(2007:2011, 2021:2024)
+  ) %>%
+  select(
+    Country_Name, Year,
+    Life_expectancy, Annual_Change
+  )
+
+# Check for unusually low life expectancy measurements
+country_data %>%
+  filter(
+    !is.na(Life_expectancy),
+    Life_expectancy < 20
+  ) %>%
+  arrange(Life_expectancy) %>%
+  select(
+    Country_Name, Year, Life_expectancy
+  ) %>%
+  head(10)
+```
+We used `lag()` to calculate annual changes in life expectancy for each country after arranging observations by country and year. Changes exceeding 10 years in either direction were flagged for further investigation, as such large annual differences may indicate potential inconsistencies.
+
+The results identified 47 observations exceeding this threshold. The largest increase occurred in the Central African Republic in 2023 (+38.590 years), while the largest decrease occurred in the same country in 2009 (−35.208 years). Cambodia also showed substantial changes in 1975 and 1979.
+
+These observations were considered potential inconsistencies rather than confirmed errors. Large changes may reflect historical events or data estimation issues. Therefore, further examination of surrounding years and source information was necessary before deciding whether to retain or modify the values.
+
+We further examined the surrounding years for the Central African Republic and identified unusually large fluctuations. Life expectancy decreased from 49.873 years in 2008 to 14.665 in 2009 before increasing to 46.871 in 2010. A similar pattern occurred between 2021 and 2023, with life expectancy falling to 18.818 years in 2022 before increasing to 57.408 in 2023.
+
+We also identified eight observations with life expectancy below 20 years, involving Cambodia, South Sudan, and the Central African Republic. A comparison with published World Bank data confirmed that these unusual values were present in the source series. Historical events, including the Khmer Rouge period in Cambodia, may help explain some extreme mortality estimates.
+
+Since the checks did not establish that these observations were incorrect, we retained their original values rather than introducing unsupported corrections. These observations will be examined further during outlier detection, and their potential influence will be acknowledged as a limitation.
+
+```{r scan1-treatment}
+# Create an analysis dataset without 2025
+# Life expectancy is unavailable for all countries in 2025
+analysis_data <- country_data %>%
+  filter(Year != 2025)
+
+# Verify the dimensions
+dim(country_data)
+dim(analysis_data)
+
+# Check remaining missing indicator values
+colSums(is.na(
+  analysis_data[, c(
+    "GDP_per_capita",
+    "Life_expectancy",
+    "Life_Expectancy_Group"
+  )]
+))
+
+# Check the remaining incomplete observations
+sum(!complete.cases(analysis_data))
+```
+After investigating the missing-value patterns, we found that all 194 country-level life expectancy observations for 2025 were missing. Since these observations could not contribute to an analysis involving both GDP per capita and life expectancy, we used `filter()` to exclude 2025 from the analysis dataset.
+
+We created a separate dataset called analysis_data to preserve the original country_data for comparison. The results showed that the number of observations decreased from 12,804 to 12,610, while all eight variables were retained.
+
+After filtering, GDP_per_capita contained 2,277 missing values, while Life_expectancy and its derived category each contained 34 missing values. A total of 2,281 observations still contained at least one missing value.
+
+We retained the remaining missing values rather than applying mean imputation, as GDP per capita and life expectancy vary substantially across countries and years. Replacing unavailable measurements with overall averages could introduce misleading values and distort the distributions. Missing observations will be excluded only from specific calculations requiring those measurements, while all available data will be preserved.
 ---
 
 # 9. Scan II
@@ -454,7 +651,40 @@ The results showed that the 70–79 group contained the largest number of observ
 
 -->
 
-```{r scan2}
+```{r scan2-univariate}
+# Identify all numeric variables
+numeric_vars <- names(analysis_data)[
+  sapply(analysis_data, is.numeric)
+]
+
+numeric_vars
+
+# Detect univariate outliers using the IQR method
+outlier_summary <- lapply(numeric_vars, function(var) {
+
+  x <- analysis_data[[var]]
+
+  Q1 <- quantile(x, 0.25, na.rm = TRUE)
+  Q3 <- quantile(x, 0.75, na.rm = TRUE)
+  IQR_value <- IQR(x, na.rm = TRUE)
+
+  lower <- Q1 - 1.5 * IQR_value
+  upper <- Q3 + 1.5 * IQR_value
+
+  data.frame(
+    Variable = var,
+    Lower_Bound = round(lower, 2),
+    Upper_Bound = round(upper, 2),
+    Outlier_Count = sum(
+      x < lower | x > upper,
+      na.rm = TRUE
+    )
+  )
+})
+
+# Display the outlier summary
+outlier_summary <- bind_rows(outlier_summary)
+outlier_summary
 ```
 
 ---
