@@ -50,6 +50,8 @@ library(tidyr)
 library(ggplot2)
 library(readr)
 library(lubridate)
+library(outliers)
+library(MVN)
 
 # Add other packages as required
 ```
@@ -93,9 +95,9 @@ This dataset measures gross domestic product per person in current US dollars. I
 **Dataset 2: Life expectancy at birth, total (years)**  
 Source: https://data.worldbank.org/indicator/SP.DYN.LE00.IN
 
-This dataset estimates the number of years a newborn would live if current mortality patterns remained unchanged. It contains the same geographical identifiers and annual reporting structure.
+This dataset estimates the number of years a newborn would live if current mortality patterns remained unchanged and it contains the same geographical identifiers and annual reporting structure.
 
-Both datasets contain 266 country, economy, and regional aggregate records. They share the Country Code variable and reporting years, allowing them to be merged after reshaping into long format.
+Both datasets contain 266 country, economy, and regional aggregate records and share the Country Code variable and reporting years, allowing them to be merged after reshaping into long format.
 
 The datasets are initially presented in wide format, with individual years stored as separate columns. This structure will be addressed during the tidying stage.
 
@@ -106,17 +108,9 @@ The datasets are initially presented in wide format, with individual years store
 # subset_data2 <- data2[sample(nrow(data2), size = 0.8*nrow(data2)), ]
 
 # Import the World Bank datasets
-gdp_raw <- read_csv(
-  "API_NY.GDP.PCAP.CD_DS2_en_csv_v2_1529.csv",
-  skip = 4,
-  show_col_types = FALSE
-)
+gdp_raw <- read_csv("API_NY.GDP.PCAP.CD_DS2_en_csv_v2_1529.csv", skip = 4, show_col_types = FALSE)
 
-life_raw <- read_csv(
-  "API_SP.DYN.LE00.IN_DS2_en_csv_v2_1528.csv",
-  skip = 4,
-  show_col_types = FALSE
-)
+life_raw <- read_csv("API_SP.DYN.LE00.IN_DS2_en_csv_v2_1528.csv", skip = 4, show_col_types = FALSE)
 
 # Check the dimensions of both datasets
 dim(gdp_raw)
@@ -126,21 +120,33 @@ dim(life_raw)
 head(gdp_raw[, 1:4])
 head(life_raw[, 1:4])
 ```
+
+```{r column-names}
+# Show the first six and last two column names
+head(names(gdp_raw))
+tail(names(gdp_raw), 2)
+```
 We used `read_csv()` from the readr package to import both World Bank datasets into R. The `skip = 4` argument was applied to exclude the preliminary metadata lines. We then used `dim()` to examine the dimensions of each dataset and `head()` to preview the first six observations.
 
 The results showed that both datasets contain 266 observations and 71 variables. The preview confirmed that the datasets were imported successfully and contain matching geographical identifiers, including Country Name and Country Code. These identifiers will support the subsequent merging process.
+
+Both datasets contain the same columns:
+
+
+- **Country Name** (character): name of the country, economy or regional group.
+- **Country Code** (character): three-letter World Bank code. This is the common key used to join the two datasets.
+- **Indicator Name** (character): name of the measure.
+- **Indicator Code** (character): World Bank code for the measure. 
+- **1960 to 2025** (numeric): one for each year, holding GDP per capita in US dollars or life expectancy in years and Cells are blank where no value was reported.
+- **Last column** : an empty column created by an extra comma at the end of each line in the files that contains no data.
 
 ```{r data-sampling}
 # Randomly sample 95% of rows from each original dataset
 set.seed(4280335)
 
-gdp_sample <- gdp_raw[
-  sample(nrow(gdp_raw), size = floor(0.95 * nrow(gdp_raw))),
-]
+gdp_sample <- gdp_raw[sample(nrow(gdp_raw), size = floor(0.95 * nrow(gdp_raw))),]
 
-life_sample <- life_raw[
-  sample(nrow(life_raw), size = floor(0.95 * nrow(life_raw))),
-]
+life_sample <- life_raw[sample(nrow(life_raw), size = floor(0.95 * nrow(life_raw))),]
 
 # Verify sampled dimensions
 dim(gdp_sample)
@@ -149,7 +155,7 @@ dim(life_sample)
 
 We used `set.seed(4280335)` to ensure that the random sampling process is reproducible. We then applied `sample()` to independently select approximately 95% of the observations from each original dataset, using `floor()` to obtain a whole-number sample size.
 
-The results showed that both datasets were reduced from 266 to 252 observations, while retaining all 71 variables. This corresponds to approximately 94.74% of the original observations, satisfying the requirement to randomly sample at least 80% but less than 100% of each dataset. All subsequent preprocessing steps will use these sampled datasets.
+The results showed that both datasets were reduced from 266 to 252 observations, while retaining all 71 variables. This corresponds to approximately 94.74% of the original observations, satisfying the requirement to randomly sample at least 80% but less than 100% of each dataset. All of the following preprocessing steps will use these sampled datasets.
 
 ```{r data-tidying}
 # Convert GDP dataset from wide to long format
@@ -188,9 +194,9 @@ dim(life_tidy)
 head(gdp_tidy)
 head(life_tidy)
 ```
-We used `pivot_longer()` from the tidyr package to reshape both datasets from wide to long format, as the original datasets stored individual years as separate columns. The year columns were converted into a single Year variable, while the corresponding values were stored in GDP_per_capita and Life_expectancy.
+We used `pivot_longer()` from the tidyr package to reshape both datasets from wide to long format, as the original datasets stored individual years as separate columns. Additionally, the year columns were then converted into a single Year variable, while the corresponding values were stored in GDP_per_capita and Life_expectancy.
 
-We then used `as.integer()` to convert Year from character to integer and `rename()` to standardise the country identifier names. All available years from 1960 to 2025 were retained to preserve the historical observations and allow missing values to be investigated during the scanning stage.
+We then used `as.integer()` to convert Year from character to integer and `rename()` to standardise the country identifier names. Moreover, all available years from 1960 to 2025 were retained to preserve the historical observations and allow missing values to be investigated later during the scanning stage.
 
 The results showed that both datasets were reshaped into 16,632 observations and four variables. Each row now represents one geographical record in a specific year, making the datasets suitable for merging using Country_Code and Year.
 
@@ -220,10 +226,7 @@ The resulting dataset contains 15,708 observations and five variables, represent
 
 ```{r data-filter-countries}
 # Import the World Bank country metadata
-country_metadata <- read_csv(
-  "Metadata_Country_API_NY.GDP.PCAP.CD_DS2_en_csv_v2_1529.csv",
-  show_col_types = FALSE
-) %>%
+country_metadata <- read_csv("Metadata_Country_API_NY.GDP.PCAP.CD_DS2_en_csv_v2_1529.csv",show_col_types = FALSE) %>%
   select(`Country Code`, Region, IncomeGroup) %>%
   rename(Country_Code = `Country Code`)
 
@@ -251,8 +254,7 @@ We then applied `left_join()` to attach Region and IncomeGroup classifications t
 
 The results showed that 44 regional and other aggregate records were excluded from the 238 matched geographical records. The resulting dataset contains 12,804 observations and seven variables, representing 194 individual countries and economies across 66 years (1960–2025).
 
-Importantly, the metadata did not modify, replace, or recalculate any GDP per capita or life expectancy values for the retained observations. It was used only to provide country classifications and support the exclusion of aggregates. Therefore, the analysis remains based on the two original World Bank indicator datasets, and their missing values were preserved for investigation during the scanning stage.
-
+Importantly, the metadata did not modify, replace, or recalculate any GDP per capita or life expectancy values for the retained observations. Instead, it was used only to provide country classifications and support the exclusion of aggregates. Therefore, the analysis remains based on the two original World Bank indicator datasets, and their missing values were preserved for investigation during the scanning stage.
 
 # 5. Understand
 
@@ -332,8 +334,6 @@ We then used `sapply()` with `class()` to verify the conversions and `levels()` 
 
 The frequency table showed that the original income-group counts remained unchanged after conversion. The dataset continues to contain character, numeric, integer, and factor variables, satisfying the required variety of data types.
 
-
-
 ---
 
 # 6. Tidy & Manipulate Data I
@@ -347,23 +347,17 @@ The frequency table showed that the original income-group counts remained unchan
 -->
 Both World Bank datasets were originally presented in wide format, with each country or economy occupying one row and annual measurements from 1960 to 2025 stored in separate columns.
 
-This structure is untidy for country-year analysis because the year values are embedded in column names rather than stored in a single variable. To satisfy the tidy data principles, each year should be represented as a value in one Year column, with the corresponding GDP per capita or life expectancy measurement stored in another column.
+We found that this structure is untidy for country-year analysis because the year values are embedded in column names rather than stored in a single variable. And to satisfy the tidy data principles, each year should be represented as a value in one Year column, with the corresponding GDP per capita or life expectancy measurement stored in another column.
 
-We therefore used `pivot_longer()` in Section 4 to reshape both sampled datasets into long format before merging them.
+Therefore, we used `pivot_longer()` in Section 4 to reshape both sampled datasets into long format before merging them.
 
 ```{r tidy1}
 # Show the original wide format (three example years)
 head(
-  gdp_sample[, c("Country Name", "Country Code",
-                 "1960", "1961", "1962")],
-  3
-)
+  gdp_sample[, c("Country Name", "Country Code", "1960", "1961", "1962")], 3)
 
 head(
-  life_sample[, c("Country Name", "Country Code",
-                  "1960", "1961", "1962")],
-  3
-)
+  life_sample[, c("Country Name", "Country Code", "1960", "1961", "1962")],3)
 
 # Show the tidy long format
 head(gdp_tidy, 6)
@@ -380,6 +374,7 @@ After applying `pivot_longer()`, the results showed that both datasets contained
 The reshaped datasets satisfy the three tidy data principles: each variable occupies one column, each country-year observation occupies one row, and each cell contains a single value. Missing indicator values were preserved for further investigation during the scanning stage.
 
 This structure also allows the two datasets to be merged consistently using Country_Code and Year.
+
 ---
 
 # 7. Tidy & Manipulate Data II
@@ -407,10 +402,7 @@ country_data <- country_data %>%
 # Preview the new variable
 head(
   country_data %>%
-    select(Country_Name, Year, Life_expectancy,
-           Life_Expectancy_Group),
-  10
-)
+    select(Country_Name, Year, Life_expectancy, Life_Expectancy_Group), 10)
 
 # Check the structure and levels
 str(country_data$Life_Expectancy_Group)
@@ -427,6 +419,7 @@ We used `mutate()` and `cut()` to create a new variable called Life_Expectancy_G
 We set `right = FALSE` to ensure that boundary values were included in the appropriate categories and `ordered_result = TRUE` to create an ordered factor. The original Life_expectancy measurements were preserved.
 
 The results showed that the 70–79 group contained the largest number of observations (4,549), while the 80+ group contained the smallest (797). There were also 228 missing classifications, corresponding to missing life expectancy values. The dataset retained all 12,804 observations and now contains eight variables.
+
 ---
 
 # 8. Scan I
@@ -637,7 +630,39 @@ We created a separate dataset called analysis_data to preserve the original coun
 
 After filtering, GDP_per_capita contained 2,277 missing values, while Life_expectancy and its derived category each contained 34 missing values. A total of 2,281 observations still contained at least one missing value.
 
-We retained the remaining missing values rather than applying mean imputation, as GDP per capita and life expectancy vary substantially across countries and years. Replacing unavailable measurements with overall averages could introduce misleading values and distort the distributions. Missing observations will be excluded only from specific calculations requiring those measurements, while all available data will be preserved.
+```{r scan1-deletion}
+# Count the GDP values available for each country
+no_gdp <- analysis_data %>%
+  group_by(Country_Code, Country_Name) %>%
+  summarise(GDP_values = sum(!is.na(GDP_per_capita)), .groups = "drop") %>%
+  filter(GDP_values == 0)
+
+# Remove these countries with no gdp
+no_gdp
+analysis_data <- analysis_data %>%
+  filter(!Country_Code %in% no_gdp$Country_Code)
+dim(analysis_data)
+
+# Remove the remaining observations with missing values
+analysis_data <- analysis_data[complete.cases(analysis_data), ]
+
+# Check the result
+dim(analysis_data)
+n_distinct(analysis_data$Country_Code)
+colSums(is.na(analysis_data))
+```
+
+We first used `group_by()` and `summarise()` to count the GDP per capita values available for each country, which found two countries, Gibraltar and North Korea (listed as "Korea, Dem. People's Rep."), had no GDP values in any year. With no GDP information at all, these countries could not contribute to the analysis, so we removed them using `filter()`, which reduced the dataset to 12,480 observations from 192 countries.
+
+We then used `complete.cases()` to remove the remaining 2,151 observations that contained a missing value: 2,147 with missing GDP per capita and 4 with missing life expectancy only. Only GDP per capita, life expectancy and the life expectancy group contained missing values, so no observations were removed because of other variables.
+
+We chose deletion rather than imputation for three reasons:
+- Most missing GDP values are in early years, especially the 1960s, or in periods when a country did not yet exist as an independent economy or was not reporting data.
+- Filling around 17% of GDP values with averages or medians would create many identical, made-up values and would disfigure the outlier checks in Section 9 and the transformation in Section 10.
+- Our analysis compares GDP per capita with life expectancy, so each observation needs both values.
+
+Our deletion removed about 17% of the observations as the missing values are concentrated in early years and in some lower-income countries, the cleaned data under-represents these groups, which is a limitation we found. The final dataset contains 10,329 complete observations from 192 countries, with no missing values remaining.
+
 ---
 
 # 9. Scan II
@@ -651,41 +676,202 @@ We retained the remaining missing values rather than applying mean imputation, a
 
 -->
 
-```{r scan2-univariate}
-# Identify all numeric variables
-numeric_vars <- names(analysis_data)[
-  sapply(analysis_data, is.numeric)
-]
+```{r scan2-univariate, fig.width = 9, fig.height = 4.5}
+# Year is a time index rather than a measurement, so it is not checked
+outlier_vars <- c("GDP_per_capita", "Life_expectancy")
 
-numeric_vars
-
-# Detect univariate outliers using the IQR method
-outlier_summary <- lapply(numeric_vars, function(var) {
-
+# Tukey's method: flag values below Q1 - 1.5*IQR or above Q3 + 1.5*IQR
+outlier_summary <- bind_rows(lapply(outlier_vars, function(var) {
   x <- analysis_data[[var]]
-
-  Q1 <- quantile(x, 0.25, na.rm = TRUE)
-  Q3 <- quantile(x, 0.75, na.rm = TRUE)
-  IQR_value <- IQR(x, na.rm = TRUE)
-
-  lower <- Q1 - 1.5 * IQR_value
-  upper <- Q3 + 1.5 * IQR_value
-
-  data.frame(
-    Variable = var,
-    Lower_Bound = round(lower, 2),
-    Upper_Bound = round(upper, 2),
-    Outlier_Count = sum(
-      x < lower | x > upper,
-      na.rm = TRUE
-    )
-  )
-})
-
-# Display the outlier summary
-outlier_summary <- bind_rows(outlier_summary)
+  Q1 <- unname(quantile(x, 0.25))
+  Q3 <- unname(quantile(x, 0.75))
+  lower <- Q1 - 1.5 * IQR(x)
+  upper <- Q3 + 1.5 * IQR(x)
+  data.frame(Variable = var,
+             Lower_Fence = round(lower, 2),
+             Upper_Fence = round(upper, 2),
+             Below_Lower = sum(x < lower),
+             Above_Upper = sum(x > upper))
+}))
 outlier_summary
+
+# Most extreme value for the three most extreme countries (used as labels)
+top_gdp <- analysis_data %>%
+  group_by(Country_Name) %>%
+  slice_max(GDP_per_capita, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  slice_max(GDP_per_capita, n = 3, with_ties = FALSE)
+
+low_life <- analysis_data %>%
+  group_by(Country_Name) %>%
+  slice_min(Life_expectancy, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  slice_min(Life_expectancy, n = 3, with_ties = FALSE)
+
+# Boxplots with the labelled points
+par(mfrow = c(1, 2), mar = c(2, 5, 3, 1), las = 1)
+
+boxplot(analysis_data$GDP_per_capita / 1000,
+        main = "GDP per capita", ylab = "US$ thousands",
+        col = "lightblue", border = "grey20", boxwex = 0.5,
+        whisklty = 1, frame.plot = FALSE, xlim = c(0.4, 2.2),
+        outpch = 16, outcex = 0.6,
+        outcol = adjustcolor("grey30", alpha.f = 0.35))
+points(rep(1, 3), top_gdp$GDP_per_capita / 1000, pch = 16, col = "red")
+text(1, top_gdp$GDP_per_capita / 1000,
+     labels = paste(top_gdp$Country_Name, top_gdp$Year),
+     pos = 4, cex = 0.8, col = "red")
+
+boxplot(analysis_data$Life_expectancy,
+        main = "Life expectancy", ylab = "Years",
+        col = "lightblue", border = "grey20", boxwex = 0.5,
+        whisklty = 1, frame.plot = FALSE, xlim = c(0.4, 2.2),
+        outpch = 16, outcex = 0.6,
+        outcol = adjustcolor("grey30", alpha.f = 0.35))
+points(rep(1, 3), low_life$Life_expectancy, pch = 16, col = "red")
+text(1, low_life$Life_expectancy,
+     labels = paste(low_life$Country_Name, low_life$Year),
+     pos = 4, cex = 0.8, col = "red")
+
+par(mfrow = c(1, 1))
 ```
+
+We scanned the two numeric measurements, GDP_per_capita and Life_expectancy, for univariate outliers, however, Year was excluded because it is a time index rather than a measurement, and every value from 1960 to 2024 is already valid.
+
+We first used Tukey's boxplot method, which flags values below Q1 − 1.5 × IQR or above Q3 + 1.5 × IQR and then drew the boxplots with boxplot() and labelled the most extreme value for the three most extreme countries in each variable. GDP per capita is shown in thousands of US dollars for easier readability. GDP per capita had 1,356 outliers (13.1% of observations), all above the upper fence of $23,170.20, with Monaco, Liechtenstein and Bermuda the most extreme. Life expectancy had 51 outliers (0.5%), all below the lower fence of 36.69 years, with the lowest values in Cambodia (1975–1978, lowest 11.3 years in 1977), the Central African Republic (2009) and Somalia (1992).
+
+```{r scan2-zscores}
+# z-scores (outliers package): flag values more than 3 standard deviations from the mean
+z_gdp  <- analysis_data$GDP_per_capita %>% scores(type = "z")
+z_life <- analysis_data$Life_expectancy %>% scores(type = "z")
+
+length(which(abs(z_gdp) > 3))
+length(which(abs(z_life) > 3))
+
+# Countries behind the flagged values
+n_distinct(analysis_data$Country_Name[which(abs(z_gdp) > 3)])
+table(analysis_data$Country_Name[which(abs(z_life) > 3)])
+```
+
+Next, we used the z-score method with `scores()` from the outliers package, which flags values more than three standard deviations from the mean. This identified 210 GDP per capita values from 17 countries and 19 life expectancy values from 8 countries. The z-score method flagged fewer values than Tukey's method as it assumes a roughly normal distribution, while the boxplots show that GDP per capita is strongly right-skewed. Therefore, we relied mainly on Tukey's method, which does not require normality. (Both methods identified the same extreme cases, such as Monaco, Liechtenstein, Cambodia (1975–1978) and Somalia (1991–1992)).
+
+```{r scan2-investigate}
+# Fences for each variable
+gdp_fence  <- quantile(analysis_data$GDP_per_capita, 0.75) +
+  1.5 * IQR(analysis_data$GDP_per_capita)
+life_fence <- quantile(analysis_data$Life_expectancy, 0.25) -
+  1.5 * IQR(analysis_data$Life_expectancy)
+
+# GDP outliers by income group and decade
+gdp_outliers <- analysis_data %>% filter(GDP_per_capita > gdp_fence)
+table(gdp_outliers$IncomeGroup)
+table(floor(gdp_outliers$Year / 10) * 10)
+
+# Life expectancy outliers by country
+analysis_data %>%
+  filter(Life_expectancy < life_fence) %>%
+  count(Country_Name, sort = TRUE)
+```
+
+We then examined which observations were flagged, to decide whether they were errors or genuine values. All 1,356 GDP outliers belong to high-income economies, and about 82% were recorded from 2000 onwards. We believe that this is because GDP per capita is measured in current US dollars, which are not adjusted for inflation, so values naturally rise over time.
+
+The 51 life expectancy outliers come from 12 countries with most coming from very low-income countries in the 1960s and 1970s, such as Niger (16), Mali (9) and Sierra Leone (7), when life expectancy was much lower than it is today. Others match well-known wars, famines or mass killings, such as Cambodia under the Khmer Rouge (1975–1978), Bangladesh's war of independence (1971), and famines in Ethiopia (1983) and Somalia (1991–1992 and 2011). The three Central African Republic values (2009, 2019 and 2022) are sudden one-year falls similar to those identified in Scan I.
+
+```{r scan2-bivariate}
+# Bivariate boxplots: each variable by income group
+par(mfrow = c(1, 2))
+bp_gdp <- boxplot(GDP_per_capita ~ IncomeGroup, data = analysis_data,
+                  names = c("Low", "Lower-mid", "Upper-mid", "High"),
+                  main = "GDP per capita by income group",
+                  xlab = "Income group", ylab = "Current US$", cex.axis = 0.8)
+bp_life <- boxplot(Life_expectancy ~ IncomeGroup, data = analysis_data,
+                   names = c("Low", "Lower-mid", "Upper-mid", "High"),
+                   main = "Life expectancy by income group",
+                   xlab = "Income group", ylab = "Years", cex.axis = 0.8)
+par(mfrow = c(1, 1))
+
+# Number of outliers within each income group
+table(factor(bp_gdp$group, levels = 1:4, labels = bp_gdp$names))
+table(factor(bp_life$group, levels = 1:4, labels = bp_life$names))
+```
+
+To check for outliers within groups, we drew bivariate boxplots of each variable by income group. These flagged 526 GDP values and 154 life expectancy values as unusual within their own income group. Many of these reflect changes over time, because each country's current income group is applied to all of its years. For example, Syria is now classified as low income, but its GDP per capita before the civil war (1979–2012) was well above that of most low-income countries. Similarly, countries now classified as high or upper-middle income, such as Saudi Arabia, South Korea and Algeria, had much lower life expectancy in the 1960s and 1970s.
+
+```{r scan2-multivariate}
+# Scatter plot of the two numeric variables
+plot(analysis_data$GDP_per_capita, analysis_data$Life_expectancy,
+     xlab = "GDP per capita (current US$)", ylab = "Life expectancy (years)",
+     main = "GDP per capita vs life expectancy", pch = 20, cex = 0.5)
+
+# Robust Mahalanobis distance (MVN package)
+# Doornik-Hansen test is used because the default test needs too much
+# memory for more than 10,000 observations
+set.seed(4280335)
+mv_results <- mvn(
+  data = as.data.frame(analysis_data[, c("GDP_per_capita", "Life_expectancy")]),
+  mvn_test = "doornik_hansen",
+  multivariate_outlier_method = "quan",
+  show_new_data = TRUE
+)
+
+# Multivariate normality test
+mv_results$multivariate_normality
+
+# Number of potential multivariate outliers
+mv_out <- mv_results$multivariate_outliers
+nrow(mv_out)
+
+# The five most extreme observations
+mv_out <- mv_out[order(-mv_out$Mahalanobis.Distance), ]
+top_mv <- as.numeric(head(mv_out$Observation, 5))
+analysis_data[top_mv, c("Country_Name", "Year", "GDP_per_capita", "Life_expectancy")]
+
+# Size of the data if all multivariate outliers were removed
+dim(mv_results$new_data)
+```
+
+To look for potential multivariate outliers, we first plotted GDP per capita against life expectancy. The scatter plot shows a curved relationship: life expectancy rises quickly as GDP per capita increases from low levels and then levels off, while a small number of very wealthy economies stretch far to the right.
+
+We then used `mvn()` from the MVN package with `multivariate_outlier_method = "quan"`. This calculates robust Mahalanobis distances, which measure how unusual an observation is when both variables are considered together, and flags observations above the chi-square critical value at the 97.5% level. We then set `show_new_data = TRUE` to see how much data would remain if the flagged observations were removed. A choice we made was using the Doornik–Hansen test (`mvn_test = "doornik_hansen"`) instead of the default Henze–Zirkler test as the default test needs too much memory for more than 10,000 observations. In the end, it showed that the two variables are not multivariate normal (p < 0.001).
+
+The method flagged [N] observations ([X]% of the data) as potential multivariate outliers, with Monaco and Liechtenstein the most extreme. This very large number is mainly a result of the strong skewness in GDP per capita. The robust method centres on the most common values, which are low-income observations, so most observations from middle- and high-income economies look unusual. (Removing all flagged observations would leave only [rows] of the 10,329 observations).
+
+```{r scan2-capping}
+# Capping function from Module 6
+cap <- function(x){
+  quantiles <- quantile(x, c(.05, 0.25, 0.75, .95))
+  x[x < quantiles[2] - 1.5*IQR(x)] <- quantiles[1]
+  x[x > quantiles[3] + 1.5*IQR(x)] <- quantiles[4]
+  x
+}
+
+# Apply capping to copies of the variables (original data unchanged)
+gdp_capped  <- analysis_data$GDP_per_capita %>% cap()
+life_capped <- analysis_data$Life_expectancy %>% cap()
+
+# Compare original and capped values
+summary(analysis_data$GDP_per_capita)
+summary(gdp_capped)
+summary(analysis_data$Life_expectancy)
+summary(life_capped)
+
+# Number of values that capping would increase or decrease
+sum(gdp_capped > analysis_data$GDP_per_capita)
+sum(gdp_capped < analysis_data$GDP_per_capita)
+sum(life_capped > analysis_data$Life_expectancy)
+```
+
+Finally, we tested capping (winsorising) using the `cap()` function on copies of the two variables, so the original data was not changed. For GDP per capita, capping replaced all 1,356 outliers with the 95th percentile ($46,573), reducing the maximum from $288,002. However, because 13.1% of values were above the upper fence, 839 of them were actually increased, as they lay between the fence ($23,170) and the 95th percentile. For life expectancy, capping raised all 51 outliers to the 5th percentile (45.1 years). As a result, Cambodia's value of 11.3 years in 1977 would end up higher than 466 observations that were not outliers.
+
+**Decision on outliers**
+
+After investigating the outliers and testing the Module 6 handling methods, we kept all observations in their original form:
+
+- The outliers are genuine values, not data entry or processing errors and they reflect real differences in wealth, low life expectancy in the 1960s and 1970s, and real wars and famines. Module 6 recommends removing or imputing outliers mainly when they result from errors.
+- Removing outliers would remove a large share of the data: 13.1% of observations under Tukey's method and [X]% under the MVN method, including most recent observations from high-income economies.
+- Capping disfigured both variables as it increased 839 GDP values, gave all 1,356 GDP outliers the same value, and placed the lowest life expectancy values above 466 ordinary observations.
+
+Instead, we will reduce the influence of the extreme GDP values with a log transformation later in #10 Transform, which is another way to handle outliers. Additionally, the unusual Central African Republic values remain a possible data-quality issue and a limitation of this analysis, therefore the dataset still contains 10,329 observations from 192 countries.
 
 ---
 
@@ -698,7 +884,7 @@ outlier_summary
   - Adjust scale for comprehension  
   - Convert non-linear → linear  
   - Reduce skewness / normalise distribution
-
+  
 -->
 
 ```{r transform}
