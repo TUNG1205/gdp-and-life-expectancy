@@ -630,14 +630,34 @@ colSums(is.na(
 
 # Check the remaining incomplete observations
 sum(!complete.cases(analysis_data))
+
+# Keep complete GDP and life expectancy pairs for joint analysis
+paired_data <- analysis_data %>%
+  filter(
+    !is.na(GDP_per_capita),
+    !is.na(Life_expectancy)
+  )
+
+# Compare the dimensions
+dim(analysis_data)
+dim(paired_data)
+
+# Verify that both indicators are complete
+colSums(is.na(
+  paired_data[, c("GDP_per_capita", "Life_expectancy")]
+))
 ```
-After investigating the missing-value patterns, we found that all 194 country-level life expectancy observations for 2025 were missing. Since these observations could not contribute to an analysis involving both GDP per capita and life expectancy, we used `filter()` to exclude 2025 from the analysis dataset.
+After investigating the missing-value patterns, we found that all 194 country-level life expectancy observations for 2025 were missing. Since these observations could not contribute to a joint analysis of GDP per capita and life expectancy, we used `filter()` to exclude 2025 from the analysis dataset.
 
 We created a separate dataset called analysis_data to preserve the original country_data for comparison. The results showed that the number of observations decreased from 12,804 to 12,610, while all eight variables were retained.
 
-After filtering, GDP_per_capita contained 2,277 missing values, while Life_expectancy and its derived category each contained 34 missing values. A total of 2,281 observations still contained at least one missing value.
+After filtering, GDP_per_capita contained 2,277 missing values, while Life_expectancy and its derived Life_Expectancy_Group variable each contained 34 missing values. A total of 2,281 observations (18.09%) contained at least one missing value.
 
-We retained the remaining missing values rather than applying mean imputation, as GDP per capita and life expectancy vary substantially across countries and years. Replacing unavailable measurements with overall averages could introduce misleading values and distort the distributions. Missing observations will be excluded only from specific calculations requiring those measurements, while all available data will be preserved.
+We retained the remaining missing values as NA rather than applying mean imputation, as GDP per capita and life expectancy vary substantially across countries and historical periods. Replacing unavailable measurements with overall averages could introduce unrealistic values and distort the distributions.
+
+For analyses requiring both indicators, we created a separate dataset called paired_data using `filter()` to retain observations with available GDP per capita and life expectancy measurements. The results showed that paired_data contained 10,329 observations and eight variables, with no missing values in either indicator.
+
+The original analysis_data was preserved so that observations with only one available indicator could still contribute to univariate analyses. However, since missingness varies across countries and years, analyses based on complete observations may not fully represent all historical periods and economies.
 ---
 
 # 9. Scan II
