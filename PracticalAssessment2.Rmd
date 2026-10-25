@@ -65,8 +65,8 @@ This report prepares two World Bank datasets, GDP per capita and life expectancy
 - **Data and subsetting:** Both datasets cover 266 countries and regions from 1960 to 2025 and as required, we randomly kept 95% of each (252 rows), using a student number as the seed.
 - **Tidying and merging:** Each year was stored in a separate column, so we reshaped both datasets to one row per country per year. We then joined them on country code and year, then used the World Bank's country information to remove 44 regional groups such as "World", leaving 194 countries.
 - **Data types:** We converted Year to whole numbers, Region to a factor and Income Group to an ordered factor (Low to High income). Moreover, we also created an ordered Life Expectancy Group (Below 60 to 80+).
-- **Missing values and errors:** GDP was missing in 18% of rows, mostly in the 1960s, and no impossible or special values were found. We proceeded to remove 2025 (no life expectancy data), two countries without GDP data and the remaining incomplete rows rather than inventing values, which left us with 10,329 complete rows from 192 countries.
-- **Outliers:** Boxplots, z-scores and a two-variable check found many extreme values, such as very wealthy Monaco and very low life expectancy during wars and famines, like Cambodia in 1975–1978. However, these values are real, so we kept them, as removing or capping them would disfigure the data.
+- **Missing values and errors:** GDP per capita contained approximately 18% missing observations, making the treatment decision challenging. Mean imputation could distort differences across countries and historical periods, while deletion could reduce representativeness. We therefore examined missingness by year and country before selecting complete-case deletion for the joint analysis and acknowledging its limitations.
+- **Outliers:** Boxplots, z-scores and a two-variable check found many extreme values, such as very wealthy Monaco and very low life expectancy during wars and famines, like Cambodia in 1975–1978. We retained these observations because they were not confirmed errors, although some remain uncertain
 - **Transformation:** We found that GDP per capita was strongly right-skewed and after comparing five transformations, we applied a base-10 log, which made GDP nearly symmetric (skewness 4.48 to 0.10) and turned its curved relationship with life expectancy into a roughly straight line (correlation 0.53 to 0.84).
 
 # 4. Data
@@ -85,8 +85,9 @@ life_raw <- read_csv("API_SP.DYN.LE00.IN_DS2_en_csv_v2_1528.csv", skip = 4, show
 # Check the dimensions of both datasets
 dim(gdp_raw)
 dim(life_raw)
-# Preview the identifying variables
-head(gdp_raw[, 1:4])
+# Preview observations from each dataset
+head(gdp_raw[, 1:4], 2)
+head(life_raw[, 1:4], 2)
 ```
 ```{r column-names}
 # Show the first six and last two column names
@@ -150,6 +151,8 @@ merged_data <- inner_join(
 )
 # Check the merged dataset
 dim(merged_data)
+# Preview the first three merged observations
+head(merged_data, 3)
 ```
 We used count() to count how often each combination of Country_Code and Year appears, and filter(n > 1) to keep any combination appearing more than once. The results returned zero duplicates for both datasets, confirming that each country-year combination is unique. We then applied `inner_join()` from the dplyr package to merge the two datasets using Country_Code and Year. An inner join was selected to retain only the country-year combinations present in both randomly sampled datasets. We also used `select()` to avoid duplicating the country name variable. The resulting dataset contains 15,708 observations and five variables, representing 238 geographical records across 66 years (1960–2025). We used `dim()` to verify the merged structure.
 ```{r data-filter-countries}
@@ -230,8 +233,9 @@ head(
   gdp_sample[, c("Country Name", "Country Code", "1960", "1961", "1962")], 3)
 head(
   life_sample[, c("Country Name", "Country Code", "1960", "1961", "1962")],3)
-# Show the tidy long format
-head(gdp_tidy, 6)
+# Show the tidy long format of both datasets
+head(gdp_tidy, 3)
+head(life_tidy, 3)
 # Verify dimensions after reshaping
 dim(gdp_tidy)
 dim(life_tidy)
