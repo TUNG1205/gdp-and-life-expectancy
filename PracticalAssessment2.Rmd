@@ -24,11 +24,11 @@ date: "`r format(Sys.Date(), '%d/%m/%Y')`"
 
 ```{css, echo = FALSE}
 body { font-size: 12px}
-pre, pre code { font-size: 10px; line-height: 1.3; }
+pre, pre code { font-size: 10px; line-height: 1.5; }
 pre { padding: 5px; margin: 0 0 5px; page-break-inside: auto !important; break-inside: auto !important; }
 p { margin: 0 0 5px; }
-h1 { font-size: 14px; margin-top: 5px; font-weight: bold }
-h1.title { font-size: 14px; }
+h1 { font-size: 15px; margin-top: 5px; font-weight: bold }
+h1.title { font-size: 15px; }
 ```
 # 1. Students’ Details 
 
@@ -43,6 +43,8 @@ h1.title { font-size: 14px; }
 # 2. Required Packages
 
 The following R packages are required to reproduce this report.
+
+We used dplyr (Wickham et al. 2026), tidyr (Wickham, Vaughan and Girlich 2025), readr (Wickham, Hester and Bryan 2026), stringr (Wickham 2025), outliers (Komsta 2022), MVN (Korkmaz, Goksuluk and Zararsiz 2014) and forecast (Hyndman and Khandakar 2008).
 ```{r setup, include=TRUE, message=FALSE}
 knitr::opts_chunk$set (out.width = "90%")
 # Load necessary packages
@@ -61,11 +63,12 @@ library(stringr)
 This report prepares two World Bank datasets, GDP per capita and life expectancy at birth, to explore how a country's wealth relates to how long its people live.
 
 - **Data and subsetting:** Both datasets cover 266 countries and regions from 1960 to 2025 and as required, we randomly kept 95% of each (252 rows), using a student number as the seed.
-- **Tidying and merging:** Each year was stored in a separate column, so we reshaped both datasets to one row per country per year. We then joined them on country code and year, then used the World Bank's country information to remove 44 regional groups such as "World", leaving 194 countries.
-- **Data types:** We converted Year to whole numbers, Region to a factor and Income Group to an ordered factor (Low to High income). Moreover, we also created an ordered Life Expectancy Group (Below 60 to 80+).
-- **Missing values and errors:** GDP per capita contained approximately 18% missing observations, making the treatment decision challenging. Mean imputation could distort differences across countries and historical periods, while deletion could reduce representativeness. We therefore examined missingness by year and country before selecting complete-case deletion for the joint analysis and acknowledging its limitations.
-- **Outliers:** Boxplots, z-scores and a two-variable check found many extreme values, such as very wealthy Monaco and very low life expectancy during wars and famines, like Cambodia in 1975–1978. We retained these observations because they were not confirmed errors, although some remain uncertain
-- **Transformation:** We found that GDP per capita was strongly right-skewed and after comparing five transformations, we applied a base-10 log, which made GDP nearly symmetric (skewness 4.48 to 0.10) and turned its curved relationship with life expectancy into a roughly straight line (correlation 0.53 to 0.84).
+- **Tidying and merging:** Each year was stored in a separate column, so we reshaped both datasets to one row per country per year. We joined them on country code and year, then used the World Bank's country information to remove 44 regional groups such as "World", leaving 194 countries.
+- **Data types:** We converted Year to whole numbers, Region to a factor and Income Group to an ordered factor (Low to High income). We also created an ordered Life Expectancy Group (Below 60 to 80+).
+- **Missing values and errors:** GDP per capita contained approximately 18% missing observations, making the treatment decision challenging. Mean imputation could distort differences across countries and historical periods, while deletion could reduce representativeness. We therefore examined missingness by year and country before selecting complete-case deletion.
+- **Outliers:** Boxplots, z-scores and a two-variable check found many extreme values, such as very wealthy Monaco and very low life expectancy during wars and famines, like Cambodia in 1975–1978. We retained these observations because they were not confirmed errors, although some remain uncertain.
+- **Transformation:** GDP per capita was strongly right-skewed, so after comparing five transformations, we applied a base-10 log, which made GDP nearly symmetric (skewness 4.48 to 0.10) and turned its curved relationship with life expectancy into a roughly straight line (correlation 0.53 to 0.84).
+- **Limitations:** Deleting incomplete rows removed about 17% of observations, mostly from the 1960s and poorer countries, and GDP is not adjusted for inflation.
 
 # 4. Data
 
@@ -692,6 +695,7 @@ The transformation also dealt with the GDP outliers identified in Section 9: on 
 
 - Every method has assumptions, so checking results with more than one method and testing alternatives led to better decisions.
 - Checking dimensions and counts after each step helped us catch problems early, such as the countries lost during the join.
+- Next time, we would check that datasets can be linked and accessed before choosing them, and plan the page limit from the start.
 
 # 12. Presentation Link(s)
 
@@ -709,8 +713,9 @@ Important notes while recording your presentation:
 Example:
 - [Student1 Presentation](URL_here)
 - [Student2 Presentation](URL_here)
-
 -->
+- [Tung - s4275232] (https://rmit-arc.instructuremedia.com/embed/8c8c0a76-f305-4ac0-8507-888eccad83e4)
+- [Hoang - s4280335] (https://rmit-arc.instructuremedia.com/embed/c496a45d-abe5-4c10-8b96-d8d02130a705)
 
 # Generative AI Usage 
 
@@ -733,17 +738,13 @@ We used one generative AI tools in this assessment.
 
 Doornik JA and Hansen H (2008) 'An omnibus test for univariate and multivariate normality', *Oxford Bulletin of Economics and Statistics*, 70(s1):927–939, doi:10.1111/j.1468-0084.2008.00537.x.
 
-RMIT University (2026) *Val* [Model: Claude Sonnet 5], accessed 25 October 2026. https://www.rmit.edu.au/students/support-services/study-support/val
-
-World Bank (2026a) *GDP per capita (current US$)* [data set], World Bank Open Data website, accessed 24 October 2026. https://data.worldbank.org/indicator/NY.GDP.PCAP.CD
-
-World Bank (2026b) *Life expectancy at birth, total (years)* [data set], World Bank Open Data website, accessed 24 October 2026. https://data.worldbank.org/indicator/SP.DYN.LE00.IN
-
 Hyndman RJ and Khandakar Y (2008) 'Automatic time series forecasting: the forecast package for R', *Journal of Statistical Software*, 27(3):1–22, doi:10.18637/jss.v027.i03.
 
 Komsta L (2022) *outliers: Tests for outliers*, R package, version 0.15, doi:10.32614/CRAN.package.outliers.
 
 Korkmaz S, Goksuluk D and Zararsiz G (2014) 'MVN: An R package for assessing multivariate normality', *The R Journal*, 6(2):151–162, https://journal.r-project.org/articles/RJ-2014-031/RJ-2014-031.pdf.
+
+RMIT University (2026) *Val* [Model: Claude Sonnet 5], accessed 25 October 2026. https://www.rmit.edu.au/students/support-services/study-support/val
 
 Wickham H (2025) *stringr: Simple, consistent wrappers for common string operations*, R package, version 1.6.0, doi:10.32614/CRAN.package.stringr.
 
@@ -752,4 +753,8 @@ Wickham H, François R, Henry L, Müller K and Vaughan D (2026) *dplyr: A gramma
 Wickham H, Hester J and Bryan J (2026) *readr: Read rectangular text data*, R package, version 2.2.0, doi:10.32614/CRAN.package.readr.
 
 Wickham H, Vaughan D and Girlich M (2025) *tidyr: Tidy messy data*, R package, version 1.3.2, doi:10.32614/CRAN.package.tidyr.
+
+World Bank (2026a) *GDP per capita (current US$)* [data set], World Bank Open Data website, accessed 24 October 2026. https://data.worldbank.org/indicator/NY.GDP.PCAP.CD
+
+World Bank (2026b) *Life expectancy at birth, total (years)* [data set], World Bank Open Data website, accessed 24 October 2026. https://data.worldbank.org/indicator/SP.DYN.LE00.IN
 
